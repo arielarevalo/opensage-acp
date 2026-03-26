@@ -1,0 +1,60 @@
+# OpenSage configuration template for use with opensage-acp.
+#
+# This file is the "base template" that opensage-acp merges session-specific
+# overrides on top of at runtime.  The adapter automatically manages:
+#   - agent_storage_path  (scoped per session)
+#   - [mcp.services.*]    (injected from acpx session/new request)
+#
+# Copy this file, fill in the placeholders, and point opensage-acp at it via:
+#   OPENSAGE_CONFIG_PATH=/path/to/this/file opensage-acp
+# or in the TOML config:
+#   [opensage-acp]
+#   opensage_config_template = "/path/to/this/file"
+
+# ── LLM backend (via LiteLLM) ───────────────────────────────────────────────
+# Model strings follow LiteLLM conventions: "provider/model-name"
+# Examples: "anthropic/claude-sonnet-4-6", "openai/gpt-4o", "gemini/gemini-2.5-pro"
+# API keys are read from environment: ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.
+
+[llm.model_configs.main]
+model_name = "anthropic/claude-sonnet-4-6"  # Primary model for the root agent
+
+# ── Neo4j graph memory (optional) ───────────────────────────────────────────
+# Set enabled = true to use persistent graph-based memory across sessions.
+# Requires a running Neo4j instance.
+
+[memory]
+enabled = false  # true | false
+
+[neo4j]
+user = "neo4j"
+password = "YOUR_NEO4J_PASSWORD_HERE"
+bolt_port = 7687  # Neo4j Bolt protocol port
+# uri = "bolt://localhost:7687"  # Override full URI if needed
+
+# ── Sandbox backend ─────────────────────────────────────────────────────────
+# Controls how opensage executes code and tools.
+# Backends: "native" (Docker), "remotedocker", "opensandbox", "local", "k8s"
+
+[sandbox]
+backend = "native"  # Requires Docker daemon running
+
+[sandbox.sandboxes.main]
+image = "opensage-main:latest"  # Docker image for the primary sandbox
+
+# ── Agent settings ────────────────────────────────────────────────────────────
+# Controls agent behavior and storage.
+# agent_storage_path is managed automatically by the adapter (per-session).
+
+[agent]
+auto_cleanup = false  # true | false — keep Docker containers alive for resume
+# agent_storage_path = "~/.local/opensage/dynamic_agents/"  # Managed by adapter
+
+# ── MCP servers (static) ────────────────────────────────────────────────────
+# MCP servers listed here are available to ALL sessions.
+# Dynamic MCP servers passed by acpx in session/new are merged automatically
+# by the adapter — you do NOT need to list those here.
+#
+# [mcp.services.example]
+# command = "npx"
+# args = ["-y", "@example/mcp-server"]

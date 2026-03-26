@@ -1,0 +1,21 @@
+{
+  "content": {
+    "role": "model",
+    "parts": [
+      {
+        "function_response": {
+          "name": "create_subagent",
+          "response": {
+            "status": "success",
+            "agent_id": "code_analyzer_001"
+          }
+        }
+      }
+    ]
+  },
+  "author": "root_agent",
+  "partial": false,
+  "error_code": null,
+  "error_message": null,
+  "stopped": false
+}

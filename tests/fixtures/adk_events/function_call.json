@@ -1,0 +1,21 @@
+{
+  "content": {
+    "role": "model",
+    "parts": [
+      {
+        "function_call": {
+          "name": "create_subagent",
+          "args": {
+            "agent_name": "code_analyzer",
+            "instructions": "Analyze the target source code for buffer overflow vulnerabilities"
+          }
+        }
+      }
+    ]
+  },
+  "author": "root_agent",
+  "partial": false,
+  "error_code": null,
+  "error_message": null,
+  "stopped": false
+}
