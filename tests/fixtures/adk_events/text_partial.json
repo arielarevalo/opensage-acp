@@ -1,0 +1,11 @@
+{
+  "content": {
+    "role": "model",
+    "parts": [{"text": "The vulnerability exists in the"}]
+  },
+  "author": "root_agent",
+  "partial": true,
+  "error_code": null,
+  "error_message": null,
+  "stopped": false
+}
