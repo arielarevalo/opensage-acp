@@ -4,6 +4,13 @@ All notable changes to opensage-acp are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/arielarevalo/opensage-acp/compare/v0.1.0...v0.2.0) (2026-03-27)
+
+
+### Features
+
+* initial release opensage-acp v0.1.0 ([e2fd82a](https://github.com/arielarevalo/opensage-acp/commit/e2fd82ad0cc56e0d4dfe48094f10caea13e0458d))
+
 ## [0.1.0] - 2026-03-26
 
 Initial release.
