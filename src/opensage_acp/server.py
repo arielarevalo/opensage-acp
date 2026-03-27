@@ -55,6 +55,7 @@ from acp.schema import (
     ResourceContentBlock,
     ResumeSessionResponse,
     SessionCapabilities,
+    SessionListCapabilities,
     SessionInfo,
     SseMcpServer,
     TextContentBlock,
@@ -139,7 +140,7 @@ class OpenSageACPAgent:
             protocol_version=protocol_version,
             agent_capabilities=AgentCapabilities(
                 load_session=True,
-                session_capabilities=SessionCapabilities(list={}),
+                session_capabilities=SessionCapabilities(list=SessionListCapabilities()),
             ),
         )
 
