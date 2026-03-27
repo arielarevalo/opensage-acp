@@ -6,7 +6,7 @@ Architecture:
 
 For each ACP session the agent:
   1. Allocates a port from the configured range.
-  2. Optionally generates a per-session TOML config (MCP injection: Phase 2).
+  2. Generates a per-session TOML config (with MCP server injection).
   3. Spawns ``opensage web <agent_dir> --port <port> --session-id <id>``.
   4. Waits for the process to pass a health check.
   5. Creates an ``OpenSageHttpBridge`` pointing at it.
@@ -54,6 +54,7 @@ from acp.schema import (
     McpServerStdio,
     ResourceContentBlock,
     ResumeSessionResponse,
+    SessionCapabilities,
     SessionInfo,
     SseMcpServer,
     TextContentBlock,
@@ -136,7 +137,10 @@ class OpenSageACPAgent:
         log.debug("initialize: protocol_version=%d", protocol_version)
         return InitializeResponse(
             protocol_version=protocol_version,
-            agent_capabilities=AgentCapabilities(),
+            agent_capabilities=AgentCapabilities(
+                load_session=True,
+                session_capabilities=SessionCapabilities(list={}),
+            ),
         )
 
     async def new_session(
@@ -158,7 +162,8 @@ class OpenSageACPAgent:
             session = _Session(bridge=bridge, process=None, port=None, cwd=cwd)
         else:
             port = self._alloc_port()
-            process = self._spawn_opensage_web(session_id, port, mcp_servers)
+            config_path = self._generate_config(session_id, mcp_servers)
+            process = self._spawn_opensage_web(session_id, port, config_path=config_path)
             base_url = f"http://127.0.0.1:{port}"
             bridge = OpenSageHttpBridge(
                 base_url=base_url,
@@ -204,12 +209,12 @@ class OpenSageACPAgent:
         # Check for disk snapshot
         session_dir = _session_dir(session_id)
         if not Path(session_dir).exists():
-            log.debug("load_session: %s not found (no disk snapshot)", session_id)
-            return None
+            raise RequestError(-32602, f"Session not found: {session_id}")
 
         # Resume from disk: spawn opensage-web with --resume
         port = self._alloc_port()
-        process = self._spawn_opensage_web(session_id, port, mcp_servers, resume=True)
+        config_path = self._generate_config(session_id, mcp_servers)
+        process = self._spawn_opensage_web(session_id, port, config_path=config_path, resume=True)
         base_url = f"http://127.0.0.1:{port}"
         bridge = OpenSageHttpBridge(
             base_url=base_url,
@@ -311,7 +316,7 @@ class OpenSageACPAgent:
         for block in prompt:
             if isinstance(block, TextContentBlock):
                 parts.append(block.text)
-        task = " ".join(parts).strip() or "(no text)"
+        task = "".join(parts).strip() or "(no text)"
 
         log.debug("prompt: session_id=%s task=%r", session_id, task[:80])
 
@@ -324,11 +329,6 @@ class OpenSageACPAgent:
             raise RequestError(
                 -32603, f"opensage-web process died (exit code {session.process.returncode})"
             )
-
-        # Check for a cancel that arrived before we started
-        if session_id in self._cancelled:
-            self._cancelled.discard(session_id)
-            return PromptResponse(stop_reason="cancelled")
 
         try:
             async for chunk in session.bridge.run_sse(task):
@@ -459,17 +459,15 @@ class OpenSageACPAgent:
         self,
         session_id: str,
         port: int,
-        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None,
         *,
+        config_path: str | None = None,
         resume: bool = False,
     ) -> subprocess.Popen[bytes]:
         """Spawn an ``opensage web`` subprocess for this session.
 
         If *resume* is True, adds ``--resume`` to restart from a disk snapshot.
-
-        MCP server injection into the config is Phase 2 work; for now we pass
-        the template config path (if configured) directly.  A warning is logged
-        if MCP servers are supplied but cannot yet be injected.
+        If *config_path* is given, it is passed as ``--config`` to opensage-web;
+        otherwise, the global template (if configured) is used as a fallback.
         """
         cmd: list[str] = [
             self._config.opensage_command,
@@ -484,15 +482,10 @@ class OpenSageACPAgent:
         ]
         if resume:
             cmd.append("--resume")
-        if self._config.opensage_config_template:
+        if config_path:
+            cmd += ["--config", config_path]
+        elif self._config.opensage_config_template:
             cmd += ["--config", self._config.opensage_config_template]
-
-        if mcp_servers:
-            log.warning(
-                "new_session: %d MCP server(s) provided but MCP TOML injection is "
-                "not yet implemented (Phase 2).  MCP servers will be ignored.",
-                len(mcp_servers),
-            )
 
         log.info("spawning: %s", shlex.join(cmd))
         return subprocess.Popen(
