@@ -15,6 +15,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from acp.exceptions import RequestError
 
 from opensage_acp.config import Config
 from opensage_acp.server import OpenSageACPAgent
@@ -132,19 +133,19 @@ async def test_new_session_stores_session_dir():
 
 
 @pytest.mark.asyncio
-async def test_load_session_returns_none_for_unknown():
+async def test_load_session_raises_for_unknown():
     agent = OpenSageACPAgent(config=_echo_config())
-    result = await agent.load_session(cwd="/tmp", session_id="no-such")
-    assert result is None
+    with pytest.raises(RequestError):
+        await agent.load_session(cwd="/tmp", session_id="no-such")
 
 
 @pytest.mark.asyncio
-async def test_load_session_returns_none_when_no_disk_snapshot():
-    """T-09b: No in-memory session and no disk snapshot → returns None."""
+async def test_load_session_raises_when_no_disk_snapshot():
+    """T-09b: No in-memory session and no disk snapshot → raises RequestError."""
     config = Config(echo_mode=False)
     agent = OpenSageACPAgent(config=config)
-    result = await agent.load_session(cwd="/tmp", session_id="nonexistent-session-id-12345")
-    assert result is None
+    with pytest.raises(RequestError):
+        await agent.load_session(cwd="/tmp", session_id="nonexistent-session-id-12345")
 
 
 @pytest.mark.asyncio
@@ -681,7 +682,7 @@ async def test_prompt_non_text_blocks_only_sends_no_text():
 
 
 @pytest.mark.asyncio
-async def test_prompt_joins_multiple_text_blocks_with_space():
+async def test_prompt_joins_multiple_text_blocks_without_separator():
     agent = OpenSageACPAgent(config=_echo_config())
     conn = _make_mock_conn()
     agent.on_connect(conn)
@@ -702,21 +703,26 @@ async def test_prompt_joins_multiple_text_blocks_with_space():
         prompt=[_make_text_block("hello"), _make_text_block("world")],
         session_id=sid,
     )
-    assert captured == ["hello world"]
+    assert captured == ["helloworld"]
 
 
 @pytest.mark.asyncio
-async def test_prompt_pre_cancel_returns_cancelled():
+async def test_prompt_stale_cancel_does_not_poison_next_prompt():
+    """A stale cancel flag is consumed mid-stream, not before the prompt starts."""
     agent = OpenSageACPAgent(config=_echo_config())
     conn = _make_mock_conn()
     agent.on_connect(conn)
     sid = await _setup_session(agent)
 
-    # Pre-cancel before calling prompt
+    # Stale cancel flag set before calling prompt — mid-stream check picks it up
     agent._cancelled.add(sid)
 
     resp = await agent.prompt(prompt=[_make_text_block("go")], session_id=sid)
     assert resp.stop_reason == "cancelled"
+
+    # A second prompt should NOT be poisoned
+    resp2 = await agent.prompt(prompt=[_make_text_block("hello")], session_id=sid)
+    assert resp2.stop_reason == "end_turn"
 
 
 # ---------------------------------------------------------------------------
@@ -833,7 +839,7 @@ async def test_spawn_includes_host_flag():
 
     with patch("opensage_acp.server.subprocess.Popen") as mock_popen:
         mock_popen.return_value = MagicMock()
-        agent._spawn_opensage_web("sid", 8100, None)
+        agent._spawn_opensage_web("sid", 8100)
 
         cmd = mock_popen.call_args.args[0]
         assert "--host" in cmd
@@ -1251,20 +1257,17 @@ async def test_session_cleanup_tolerates_missing_config_dir():
 
 
 @pytest.mark.asyncio
-async def test_spawn_logs_warning_for_mcp_servers(caplog):
-    import logging
+async def test_spawn_uses_config_path_kwarg():
+    """_spawn_opensage_web passes config_path as --config when provided."""
     from unittest.mock import patch
-
-    from acp.schema import McpServerStdio
 
     config = Config(echo_mode=False, agent_dir="/test/agents")
     agent = OpenSageACPAgent(config=config)
 
-    mcp = McpServerStdio(command="echo", args=["hi"], env=[], name="test-mcp")
-
     with patch("opensage_acp.server.subprocess.Popen") as mock_popen:
         mock_popen.return_value = MagicMock()
-        with caplog.at_level(logging.WARNING):
-            agent._spawn_opensage_web("sid", 8100, [mcp])
+        agent._spawn_opensage_web("sid", 8100, config_path="/tmp/test-config.toml")
 
-    assert any("MCP" in record.message for record in caplog.records)
+        cmd = mock_popen.call_args.args[0]
+        assert "--config" in cmd
+        assert "/tmp/test-config.toml" in cmd

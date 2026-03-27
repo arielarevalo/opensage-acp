@@ -313,7 +313,7 @@ async def test_spawn_command_includes_agent_dir() -> None:
         return MagicMock()
 
     with patch("subprocess.Popen", side_effect=fake_popen):
-        agent._spawn_opensage_web("sess-abc", 9000, None)
+        agent._spawn_opensage_web("sess-abc", 9000)
 
     assert len(captured_cmds) == 1
     cmd = captured_cmds[0]
@@ -341,7 +341,7 @@ async def test_spawn_command_includes_config_template() -> None:
         return MagicMock()
 
     with patch("subprocess.Popen", side_effect=fake_popen):
-        agent._spawn_opensage_web("sess-xyz", 9001, None)
+        agent._spawn_opensage_web("sess-xyz", 9001)
 
     cmd = captured_cmds[0]
     assert "--config" in cmd
@@ -365,7 +365,7 @@ async def test_spawn_command_omits_config_when_not_set() -> None:
         return MagicMock()
 
     with patch("subprocess.Popen", side_effect=fake_popen):
-        agent._spawn_opensage_web("sess-noc", 9002, None)
+        agent._spawn_opensage_web("sess-noc", 9002)
 
     cmd = captured_cmds[0]
     assert "--config" not in cmd
