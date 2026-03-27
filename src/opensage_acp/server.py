@@ -55,8 +55,8 @@ from acp.schema import (
     ResourceContentBlock,
     ResumeSessionResponse,
     SessionCapabilities,
-    SessionListCapabilities,
     SessionInfo,
+    SessionListCapabilities,
     SseMcpServer,
     TextContentBlock,
 )
